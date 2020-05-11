@@ -11,28 +11,25 @@ class AssociationControl(object):
         if ac in dir(self):
             self.__getattribute__(ac)(intf, ap_intf)
 
-    def disconnect(self, intf):
-        return 'iw dev %s disconnect' % intf.name
-
     def llf(self, intf, ap_intf):
-        #llf: Least loaded first
+        'LLF: Least Loaded First'
         apref = intf.associatedTo
-        if apref != '':
+        if apref:
             ref_llf = len(apref.associatedStations)
             if len(ap_intf.associatedStations) + 2 < ref_llf:
-                intf.node.pexec(self.disconnect(intf))
+                intf.disconnect(apref)
                 self.changeAP = True
         else:
             self.changeAP = True
         return self.changeAP
 
     def ssf(self, intf, ap_intf):
-        #ssf: Strongest signal first
-        dist = intf.node.get_distance_to(intf.associatedTo)
+        'SSF: Strongest Signal First'
+        dist = intf.node.get_distance_to(intf.associatedTo.node)
         rssi = intf.get_rssi(ap_intf, dist)
         ref_dist = intf.node.get_distance_to(ap_intf.node)
         ref_rssi = intf.get_rssi(ap_intf, ref_dist)
         if float(ref_rssi) > float(rssi + 0.1):
-            intf.node.pexec(self.disconnect(intf))
+            intf.disconnect(ap_intf)
             self.changeAP = True
         return self.changeAP

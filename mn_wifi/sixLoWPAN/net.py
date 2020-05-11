@@ -9,15 +9,15 @@ from six import string_types
 from mininet.util import macColonHex, waitListening
 from mininet.log import error, debug, output
 
-from mn_wifi.sixLoWPAN.link import sixLoWPAN
-from mn_wifi.sixLoWPAN.node import sixLoWPan, OVSSensor, Node_6lowpan
+from mn_wifi.sixLoWPAN.link import LowPANLink
+from mn_wifi.sixLoWPAN.node import LowPANNode, OVSSensor
 from mn_wifi.sixLoWPAN.module import module
 from mn_wifi.sixLoWPAN.util import ipAdd6, netParse6
 
 
 class Mininet_IoT(object):
 
-    def __init__(self, apsensor=OVSSensor, sensor=Node_6lowpan,
+    def __init__(self, apsensor=OVSSensor, sensor=LowPANNode,
                  ip6Base='2001:0:0:0:0:0:0:0/64'):
 
         self.apsensor = apsensor
@@ -46,14 +46,18 @@ class Mininet_IoT(object):
         for sensor in sensors:
             for wpan in range(len(sensor.params['wpan'])):
                 port = 0 if isinstance(sensor, OVSSensor) else 1
-                sixLoWPAN(sensor, wpan, port=port)
+                LowPANLink(sensor, wpan, port=port)
+
+    def get_wpans(self, **params):
+        "Count the number of virtual LoWPAN interfaces"
+        return params.get('wpans', 1)
 
     def manage_wpan(self, node, **params):
         """gets number of wpans
         node: node
         params: parameters"""
         node.params['wpan'] = []
-        wpans = self.count_wpans(**params)
+        wpans = self.get_wpans(**params)
         self.nwpans += wpans
 
         for wpan in range(wpans):
@@ -75,7 +79,7 @@ class Mininet_IoT(object):
             self.nextPos_ap += 100
 
         if not cls:
-            cls = apsensor
+            cls = self.apsensor
         ap = cls(name, **defaults)
         if not self.inNamespace and self.listenPort:
             self.listenPort += 1
@@ -113,7 +117,7 @@ class Mininet_IoT(object):
         self.nextPos_sta += 1
 
         if not cls:
-            cls = sixLoWPan
+            cls = LowPANNode
         node = cls(name, **defaults)
         self.nameToNode[name] = node
 
@@ -189,14 +193,14 @@ class Mininet_IoT(object):
         sleep(2)
         nodes = self.sensors
         hosts = hosts or [nodes[0], nodes[-1]]
-        assert len(hosts) is 2
+        assert len(hosts) == 2
         client, server = hosts
         output('*** Iperf: testing', l4Type, 'bandwidth between',
                client, 'and', server, '\n')
         server.cmd('killall -9 iperf')
         iperfArgs = 'iperf -p %d ' % port
         bwArgs = ''
-        if l4Type is 'UDP':
+        if l4Type == 'UDP':
             iperfArgs += '-u '
             bwArgs = '-b ' + udpBw + ' '
         elif l4Type != 'TCP':
@@ -204,7 +208,7 @@ class Mininet_IoT(object):
         if fmt:
             iperfArgs += '-f %s ' % fmt
         server.sendCmd(iperfArgs + '-s')
-        if l4Type is 'TCP':
+        if l4Type == 'TCP':
             if not waitListening(client, server.IP(), port):
                 raise Exception('Could not connect to iperf on port %d'
                                 % port)
@@ -214,22 +218,17 @@ class Mininet_IoT(object):
         servout = ''
         # We want the last *b/sec from the iperf server output
         # for TCP, there are two of them because of waitListening
-        count = 2 if l4Type is 'TCP' else 1
+        count = 2 if l4Type == 'TCP' else 1
         while len(re.findall('/sec', servout)) < count:
             servout += server.monitor(timeoutms=5000)
         server.sendInt()
         servout += server.waitOutput()
         debug('Server output: %s\n' % servout)
         result = [self._parseIperf(servout), self._parseIperf(cliout)]
-        if l4Type is 'UDP':
+        if l4Type == 'UDP':
             result.insert(0, udpBw)
         output('*** Results: %s\n' % result)
         return result
-
-    def count_wpans(self, **params):
-        "Count the number of virtual 6LoWPAN interfaces"
-        wpans = params.get('wpans', 1)
-        return wpans
 
     @staticmethod
     def kill_fakelb():

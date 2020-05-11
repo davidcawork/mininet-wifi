@@ -4,6 +4,8 @@ mnexec
 *.1
 *.xcodeproj
 *.xcworkspace
+*.apconf
+*.swp
 \#*\#
 mininet.egg-info
 build

@@ -1,14 +1,24 @@
 #!/usr/bin/python
 
+"""
+You need to activate the following apps if you want to run this code with ONOS:
+
+onos> app activate fwd drivers.bmv2 drivers.mellanox pipelines.fabric
+      proxyarp lldpprovider hostprovider segmentrouting
+"""
+
+
 import os
+import sys
 
 from mininet.log import setLogLevel, info
 from mn_wifi.cli import CLI
 from mn_wifi.net import Mininet_wifi
-from mn_wifi.bmv2 import Bmv2AP
+from mn_wifi.bmv2 import ONOSBmv2AP
+from mininet.node import RemoteController
 
 
-def topology():
+def topology(remote_controller):
     'Create a network.'
     net = Mininet_wifi()
 
@@ -18,15 +28,23 @@ def topology():
     sta1 = net.addStation('sta1', ip='10.0.0.3', mac="00:00:00:00:00:03")
     sta2 = net.addStation('sta2', ip='10.0.0.4', mac="00:00:00:00:00:04")
 
+    args1 = dict()
+    args2 = dict()
+    if not remote_controller:
+        path = os.path.dirname(os.path.abspath(__file__))
+        json_file = path + '/ap-runtime.json'
+        config1 = path + '/commands_ap1.txt'
+        config2 = path + '/commands_ap2.txt'
+        args1 = {'json': json_file, 'switch_config': config1}
+        args2 = {'json': json_file, 'switch_config': config2}
+
     info('*** Adding P4APs\n')
-    path = os.path.dirname(os.path.abspath(__file__))
-    json_file = path + '/ap-runtime.json'
-    config1 = path + '/commands_ap1.txt'
-    config2 = path + '/commands_ap2.txt'
-    ap1 = net.addAccessPoint('ap1', json=json_file, loglevel='info',
-                             pktdump=False, switch_config=config1, cls=Bmv2AP)
-    ap2 = net.addAccessPoint('ap2', json=json_file, loglevel='info',
-                             pktdump=False, switch_config=config2, cls=Bmv2AP)
+    ap1 = net.addAccessPoint('ap1', cls=ONOSBmv2AP, netcfg=True, **args1)
+    ap2 = net.addAccessPoint('ap2', cls=ONOSBmv2AP, netcfg=True, **args2)
+
+    if remote_controller:
+        info('*** Adding Controller\n')
+        net.addController('c0', controller=RemoteController)
 
     net.configureWifiNodes()
 
@@ -38,7 +56,8 @@ def topology():
 
     info('*** Starting network\n')
     net.start()
-    net.staticArp()
+    if not remote_controller:
+        net.staticArp()
 
     info('*** Running CLI\n')
     CLI(net)
@@ -49,4 +68,5 @@ def topology():
 
 if __name__ == '__main__':
     setLogLevel('info')
-    topology()
+    remote_controller = True if '-r' in sys.argv else False
+    topology(remote_controller)
