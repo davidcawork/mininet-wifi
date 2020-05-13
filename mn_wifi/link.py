@@ -289,7 +289,7 @@ class IntfWireless(Intf):
         wlan = self.node.params['wlan'].index(self.name)
         master(self.node, wlan, port=wlan, intf=self)
 
-        intf = self.node.getNameToIntf(self)
+        intf = self.node.getNameToWintf(self)
         if int(intf.range) == 0: intf.setDefaultRange()
 
         intf.ssid = ssid
@@ -431,7 +431,8 @@ class IntfWireless(Intf):
         self.rssi = 0
         self.channel = 0
         self.associatedTo = None
-        ap_intf.associatedStations.remove(self)
+        if self in ap_intf.associatedStations:
+            ap_intf.associatedStations.remove(self)
 
     def wep_connect(self, passwd, ap_intf):
         self.iwdev_pexec('{} connect {} key d:0:{}'.format(
@@ -1539,15 +1540,16 @@ class ITSLink(LinkAttrs):
 
     def __init__(self, node, intf=None, channel=161):
         "configure ieee80211p"
-        intf = node.getNameToIntf(intf)
+        intf = node.getNameToWintf(intf)
         wlan = node.params['wlan'].index(intf.name)
+        LinkAttrs.__init__(self, node, intf, wlan)
 
         if isinstance(self, master):
             self.kill_hostapd()
 
         self.node = node
         self.channel = channel
-        self.freq = self.get_freq()
+        self.freq = str(self.get_freq()).replace('.', '')
         self.range = intf.range
         self.name = intf.name
         self.mac = intf.mac
@@ -1596,7 +1598,7 @@ class WifiDirectLink(LinkAttrs):
 
     def __init__(self, node, intf=None):
         "configure wifi-direct"
-        intf = node.getNameToIntf(intf)
+        intf = node.getNameToWintf(intf)
         wlan = node.params['wlan'].index(intf.name)
         LinkAttrs.__init__(self, node, intf, wlan)
         self.name = intf.name
@@ -1682,7 +1684,7 @@ class adhoc(LinkAttrs):
         node: name of the node
         self: custom association class/constructor
         params: parameters for station"""
-        intf = node.getNameToIntf(intf)
+        intf = node.getNameToWintf(intf)
         wlan = node.params['wlan'].index(intf.name)
 
         if isinstance(intf, master):
@@ -1768,7 +1770,7 @@ class mesh(LinkAttrs):
         node: name of the node
         self: custom association class/constructor
         params: parameters for node"""
-        intf = node.getNameToIntf(intf)
+        intf = node.getNameToWintf(intf)
         wlan = node.params['wlan'].index(intf.name)
 
         if isinstance(intf, master):

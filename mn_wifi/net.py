@@ -182,8 +182,8 @@ class Mininet_wifi(Mininet, Mininet_IoT):
                 data = conn.recv(1024).decode('utf-8').split('.')
                 if data[0] == 'set':
                     node = self.getNodeByName(data[1])
-                    if len(data) < 4:
-                        data = 'usage: set.node.method.value'
+                    if len(data) < 3:
+                        data = 'usage: set.node.method()'
                     else:
                         if data[2] == 'sumo':
                             mod = __import__('mn_wifi.sumo.function', fromlist=[data[3]])
@@ -193,18 +193,31 @@ class Mininet_wifi(Mininet, Mininet_IoT):
                             node.sumoargs = str(data[4])
                             data = 'command accepted!'
                         else:
-                            if hasattr(node, data[2]):
-                                method_to_call = getattr(node, data[2])
-                                method_to_call(data[3])
-                                data = 'command accepted!'
+                            attr = data[2].split('(')
+                            if hasattr(node, attr[0]):
+                                method_to_call = getattr(node, attr[0])
+                                if 'intf' in attr[1]:
+                                    val = attr[1].split(', intf=')
+                                    intf = val[1][:-1]
+                                    val = val[0]
+                                    method_to_call(val, intf=intf)
+                                else:
+                                    val = attr[1].split(')')[0]
+                                    method_to_call(val)
+                                    data = 'command accepted!'
                             else:
                                 data = 'unrecognized method!'
                 elif data[0] == 'get':
                     node = self.getNodeByName(data[1])
                     if len(data) < 3:
-                        data = 'usage: get.node.method'
+                        data = 'usage: get.node.attr'
                     else:
-                        data = getattr(node, data[2])
+                        if 'wintfs' in data[2]:
+                            i = int(data[2][7:-1])
+                            wintfs = getattr(node, 'wintfs')[i]
+                            data = getattr(wintfs, data[3])
+                        else:
+                            data = getattr(node, data[2])
                 else:
                     try:
                         cmd = ''
